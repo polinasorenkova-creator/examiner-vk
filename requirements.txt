@@ -1,0 +1,8 @@
+vk-api
+aiohttp
+python-dotenv
+requests
+vosk
+pydub
+audioop-lts
+Pillow
