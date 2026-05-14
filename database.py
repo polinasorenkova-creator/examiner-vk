@@ -52,14 +52,30 @@ def save_ticket(text: str, keywords: str, owner_id: int) -> int:
     conn.close()
     return number
 
-def get_random_ticket(owner_id: int) -> dict | None:
+def get_random_ticket(owner_id: int, exclude_id: int = None) -> dict | None:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT id, number, text, keywords FROM tickets WHERE owner_id = ? ORDER BY RANDOM() LIMIT 1",
-        (owner_id,)
-    )
+    if exclude_id:
+        cur.execute(
+            "SELECT id, number, text, keywords FROM tickets "
+            "WHERE owner_id = ? AND id != ? ORDER BY RANDOM() LIMIT 1",
+            (owner_id, exclude_id)
+        )
+    else:
+        cur.execute(
+            "SELECT id, number, text, keywords FROM tickets "
+            "WHERE owner_id = ? ORDER BY RANDOM() LIMIT 1",
+            (owner_id,)
+        )
     row = cur.fetchone()
+    # Если других билетов нет — берём любой
+    if not row and exclude_id:
+        cur.execute(
+            "SELECT id, number, text, keywords FROM tickets "
+            "WHERE owner_id = ? ORDER BY RANDOM() LIMIT 1",
+            (owner_id,)
+        )
+        row = cur.fetchone()
     conn.close()
     if row:
         return {"id": row[0], "number": row[1], "text": row[2], "keywords": row[3]}

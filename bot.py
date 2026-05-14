@@ -153,7 +153,7 @@ def handle(vk, event):
                 keywords = ", ".join(result.get("keywords", []))
                 number = save_ticket(question, keywords, user_id)
                 with lock:
-                    sessions.pop(user_id, None)
+                sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
                 send(vk, user_id,
                      f"Билет №{number} сохранён!\n\n"
                      f"Вопрос:\n{question}\n\n"
@@ -162,7 +162,7 @@ def handle(vk, event):
             except Exception as e:
                 logger.error(f"Ошибка OCR: {e}")
                 with lock:
-                    sessions.pop(user_id, None)
+                sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
                 send(vk, user_id,
                      "Не удалось распознать фото. "
                      "Попробуй ещё раз или напиши текстом.")
@@ -213,14 +213,15 @@ def handle(vk, event):
                  "затем нажмите «Сдать экзамен».")
             return
 
-        ticket = get_random_ticket(user_id)
+       # Запоминаем последний билет чтобы не повторять
+        last_ticket_id = session.get("last_ticket_id")
+        ticket = get_random_ticket(user_id, exclude_id=last_ticket_id)
         with lock:
-            sessions[user_id] = {"state": "waiting_answer", "ticket": ticket}
-        send(vk, user_id,
-             f"Вам достался Билет №{ticket['number']}\n\n"
-             f"Вопрос: {ticket['text']}\n\n"
-             f"Ответьте текстом или голосовым сообщением.")
-        return
+            sessions[user_id] = {
+                "state": "waiting_answer",
+                "ticket": ticket,
+                "last_ticket_id": ticket["id"]
+            }
 
     # ── ОТВЕТ СТУДЕНТА ───────────────────────────────────────────
     if state == "waiting_answer":
