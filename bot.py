@@ -6,6 +6,7 @@ import requests
 import json
 import time
 import threading
+import random
 import download_model
 from config import VK_TOKEN, ADMIN_IDS
 from database import (init_db, save_ticket, get_random_ticket,
@@ -28,8 +29,6 @@ def get_keyboard(is_admin: bool) -> VkKeyboard:
     kb.add_button("Загрузить билет", color=VkKeyboardColor.SECONDARY)
     kb.add_button("Удалить все билеты", color=VkKeyboardColor.NEGATIVE)
     return kb
-
-import random
 
 def send(vk, user_id: int, text: str, keyboard=None):
     params = {
@@ -153,7 +152,7 @@ def handle(vk, event):
                 keywords = ", ".join(result.get("keywords", []))
                 number = save_ticket(question, keywords, user_id)
                 with lock:
-                 sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
+                    sessions.pop(user_id, None)
                 send(vk, user_id,
                      f"Билет №{number} сохранён!\n\n"
                      f"Вопрос:\n{question}\n\n"
@@ -162,7 +161,7 @@ def handle(vk, event):
             except Exception as e:
                 logger.error(f"Ошибка OCR: {e}")
                 with lock:
-                 sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
+                    sessions.pop(user_id, None)
                 send(vk, user_id,
                      "Не удалось распознать фото. "
                      "Попробуй ещё раз или напиши текстом.")
@@ -213,7 +212,6 @@ def handle(vk, event):
                  "затем нажмите «Сдать экзамен».")
             return
 
-       # Запоминаем последний билет чтобы не повторять
         last_ticket_id = session.get("last_ticket_id")
         ticket = get_random_ticket(user_id, exclude_id=last_ticket_id)
         with lock:
@@ -222,6 +220,11 @@ def handle(vk, event):
                 "ticket": ticket,
                 "last_ticket_id": ticket["id"]
             }
+        send(vk, user_id,
+             f"Вам достался Билет №{ticket['number']}\n\n"
+             f"Вопрос: {ticket['text']}\n\n"
+             f"Ответьте текстом или голосовым сообщением.")
+        return
 
     # ── ОТВЕТ СТУДЕНТА ───────────────────────────────────────────
     if state == "waiting_answer":
@@ -297,7 +300,10 @@ def handle(vk, event):
 
             save_result(user_id, ticket["id"], score, max_score)
             with lock:
-                sessions.pop(user_id, None)
+                sessions[user_id] = {
+                    "state": "idle",
+                    "last_ticket_id": ticket["id"]
+                }
             send(vk, user_id,
                  f"Результат:\n\n"
                  f"{verdict}\n"
@@ -348,7 +354,6 @@ def main():
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
 
-    # Собираем ID всех старых сообщений в очереди
     logger.info("Собираю старые сообщения...")
     start_ts = int(time.time())
     old_ids = set()
@@ -363,7 +368,6 @@ def main():
     except Exception:
         pass
 
-    # Перезапускаем longpoll и заносим старые ID в processed
     longpoll = VkLongPoll(vk_session)
     with lock:
         processed_ids.clear()
@@ -377,7 +381,6 @@ def main():
         if (event.type == VkEventType.MESSAGE_NEW
                 and event.to_me
                 and not event.from_me):
-            # Дополнительная проверка по времени
             event_ts = getattr(event, 'timestamp', 0)
             if event_ts and event_ts < start_ts - 5:
                 continue
