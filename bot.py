@@ -162,7 +162,7 @@ def handle(vk, event):
             except Exception as e:
                 logger.error(f"Ошибка OCR: {e}")
                 with lock:
-                sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
+                 sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
                 send(vk, user_id,
                      "Не удалось распознать фото. "
                      "Попробуй ещё раз или напиши текстом.")
