@@ -6,6 +6,7 @@ import requests
 import json
 import time
 import threading
+import download_model
 from config import VK_TOKEN, ADMIN_IDS
 from database import (init_db, save_ticket, get_random_ticket,
                       get_ticket_count, save_result, get_user_stats,
