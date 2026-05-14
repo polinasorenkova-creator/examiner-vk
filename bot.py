@@ -153,7 +153,7 @@ def handle(vk, event):
                 keywords = ", ".join(result.get("keywords", []))
                 number = save_ticket(question, keywords, user_id)
                 with lock:
-                sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
+                 sessions[user_id] = {"state": "idle", "last_ticket_id": ticket["id"]}
                 send(vk, user_id,
                      f"Билет №{number} сохранён!\n\n"
                      f"Вопрос:\n{question}\n\n"
